@@ -3,32 +3,47 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <title>Veranstaltungen in Wandlitz</title>
     <style>
       :root {
         color-scheme: light;
-        --background: transparent;
+        --page: transparent;
         --surface: #ffffff;
-        --text: #172019;
-        --muted: #66706a;
-        --line: #dfe5e1;
-        --accent: #215c39;
-        --accent-soft: #edf5ef;
-        --radius: 16px;
+        --surface-soft: #f4f7f4;
+        --text: #18211b;
+        --muted: #647068;
+        --line: #dfe7e1;
+        --accent: #285c3f;
+        --accent-dark: #19452d;
+        --accent-soft: #e9f2ec;
+        --shadow: 0 16px 45px rgba(24, 51, 35, 0.1);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         margin: 0;
-        background: var(--background);
+        background: var(--page);
         color: var(--text);
         font-family:
-          ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input {
+        font: inherit;
       }
 
       a {
@@ -37,26 +52,199 @@
 
       .widget {
         width: 100%;
+        overflow: hidden;
       }
 
-      .toolbar {
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: clamp(24px, 5vw, 48px);
+        border: 1px solid rgba(40, 92, 63, 0.14);
+        border-radius: var(--radius-xl);
+        background:
+          radial-gradient(circle at 88% 16%, rgba(255, 255, 255, 0.72), transparent 24%),
+          linear-gradient(135deg, #eef5f0 0%, #f8faf8 55%, #e4efe7 100%);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        right: -78px;
+        bottom: -98px;
+        width: 250px;
+        height: 250px;
+        border: 52px solid rgba(40, 92, 63, 0.07);
+        border-radius: 50%;
+        pointer-events: none;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 1;
         display: flex;
         align-items: end;
         justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 18px;
+        gap: 28px;
       }
 
-      .toolbar h2 {
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 12px;
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 26px;
+        height: 2px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      h1 {
+        max-width: 720px;
         margin: 0;
-        font-size: clamp(1.5rem, 3vw, 2.25rem);
-        line-height: 1.05;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(2.1rem, 6vw, 4.35rem);
+        font-weight: 500;
+        line-height: 0.98;
+        letter-spacing: -0.045em;
       }
 
-      .toolbar p {
-        margin: 6px 0 0;
+      .intro {
+        max-width: 640px;
+        margin: 17px 0 0;
         color: var(--muted);
-        font-size: 0.95rem;
+        font-size: clamp(0.98rem, 2vw, 1.08rem);
+        line-height: 1.65;
+      }
+
+      .count-card {
+        position: relative;
+        z-index: 1;
+        flex: 0 0 auto;
+        min-width: 148px;
+        padding: 19px 22px;
+        border: 1px solid rgba(255, 255, 255, 0.82);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: 0 12px 35px rgba(40, 92, 63, 0.08);
+        backdrop-filter: blur(12px);
+      }
+
+      .count-card strong {
+        display: block;
+        color: var(--accent-dark);
+        font-size: 2rem;
+        line-height: 1;
+      }
+
+      .count-card span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: minmax(210px, 1fr) auto;
+        gap: 14px;
+        margin: 24px 0 34px;
+      }
+
+      .search-wrap {
+        position: relative;
+      }
+
+      .search-icon {
+        position: absolute;
+        top: 50%;
+        left: 17px;
+        width: 18px;
+        height: 18px;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+      }
+
+      .search {
+        width: 100%;
+        height: 50px;
+        padding: 0 18px 0 48px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        outline: none;
+        background: var(--surface);
+        color: var(--text);
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+      }
+
+      .search:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px var(--accent-soft);
+      }
+
+      .filters {
+        display: flex;
+        gap: 8px;
+        padding: 5px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+      }
+
+      .filter {
+        min-height: 38px;
+        padding: 0 16px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 0.86rem;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      .filter:hover {
+        color: var(--text);
+        background: var(--surface-soft);
+      }
+
+      .filter.is-active {
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      .month-group + .month-group {
+        margin-top: 38px;
+      }
+
+      .month-heading {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 0 0 14px;
+        color: var(--text);
+        font-size: 0.82rem;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .month-heading::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--line);
       }
 
       .events {
@@ -65,48 +253,74 @@
       }
 
       .event {
+        position: relative;
         display: grid;
-        grid-template-columns: 78px minmax(0, 1fr) auto;
-        gap: 18px;
+        grid-template-columns: 88px minmax(0, 1fr) auto;
+        gap: 20px;
         align-items: center;
-        padding: 18px;
+        min-height: 118px;
+        padding: 16px 20px 16px 16px;
         border: 1px solid var(--line);
-        border-radius: var(--radius);
+        border-radius: var(--radius-lg);
         background: var(--surface);
+        box-shadow: 0 7px 20px rgba(24, 51, 35, 0.035);
         text-decoration: none;
         transition:
-          transform 160ms ease,
-          border-color 160ms ease,
-          box-shadow 160ms ease;
+          transform 170ms ease,
+          border-color 170ms ease,
+          box-shadow 170ms ease;
+      }
+
+      .event::before {
+        content: "";
+        position: absolute;
+        inset: 12px auto 12px 0;
+        width: 3px;
+        border-radius: 0 999px 999px 0;
+        background: var(--accent);
+        opacity: 0;
+        transform: scaleY(0.45);
+        transition: opacity 170ms ease, transform 170ms ease;
       }
 
       .event:hover,
       .event:focus-visible {
-        transform: translateY(-2px);
-        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-        box-shadow: 0 10px 28px rgb(0 0 0 / 8%);
+        z-index: 1;
+        transform: translateY(-3px);
+        border-color: rgba(40, 92, 63, 0.36);
+        box-shadow: var(--shadow);
         outline: none;
       }
 
-      .date {
+      .event:hover::before,
+      .event:focus-visible::before {
+        opacity: 1;
+        transform: scaleY(1);
+      }
+
+      .date-box {
         display: grid;
+        align-content: center;
         justify-items: center;
+        min-height: 84px;
         padding: 10px 6px;
-        border-radius: 12px;
+        border-radius: var(--radius-md);
         background: var(--accent-soft);
-        color: var(--accent);
+        color: var(--accent-dark);
       }
 
-      .date strong {
-        font-size: 1.65rem;
-        line-height: 1;
+      .date-box strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 2rem;
+        font-weight: 600;
+        line-height: 0.95;
       }
 
-      .date span {
-        margin-top: 4px;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
+      .date-box span {
+        margin-top: 7px;
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.11em;
         text-transform: uppercase;
       }
 
@@ -114,62 +328,283 @@
         min-width: 0;
       }
 
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 7px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--accent-dark);
+        font-size: 0.68rem;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
       .title {
         margin: 0;
-        font-size: 1.05rem;
-        line-height: 1.3;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1.12rem, 2.2vw, 1.42rem);
+        font-weight: 600;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
       }
 
       .meta {
         display: flex;
         flex-wrap: wrap;
-        gap: 5px 14px;
-        margin-top: 7px;
+        gap: 8px 18px;
+        margin-top: 10px;
         color: var(--muted);
-        font-size: 0.92rem;
+        font-size: 0.88rem;
+        line-height: 1.45;
       }
 
-      .arrow {
+      .meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .meta-item svg {
+        flex: 0 0 auto;
+        width: 15px;
+        height: 15px;
         color: var(--accent);
-        font-size: 1.35rem;
-        line-height: 1;
       }
 
-      .status {
-        padding: 20px;
+      .action {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 13px 10px 16px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--accent-dark);
+        font-size: 0.78rem;
+        font-weight: 800;
+        white-space: nowrap;
+        transition: background 170ms ease, color 170ms ease;
+      }
+
+      .event:hover .action,
+      .event:focus-visible .action {
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      .action svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .status,
+      .empty {
+        padding: 30px;
         border: 1px solid var(--line);
-        border-radius: var(--radius);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
         color: var(--muted);
+        text-align: center;
+      }
+
+      .status a,
+      .empty a {
+        color: var(--accent);
+        font-weight: 750;
+      }
+
+      .skeleton {
+        position: relative;
+        overflow: hidden;
+        min-height: 118px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
         background: var(--surface);
       }
 
-      .source {
-        margin: 16px 2px 0;
+      .skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          100deg,
+          transparent 20%,
+          rgba(255, 255, 255, 0.85) 42%,
+          transparent 65%
+        );
+        transform: translateX(-100%);
+        animation: shimmer 1.4s infinite;
+      }
+
+      .skeleton-inner {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 20px;
+        align-items: center;
+        height: 100%;
+        padding: 16px;
+      }
+
+      .skeleton-date,
+      .skeleton-line {
+        border-radius: 12px;
+        background: #edf1ee;
+      }
+
+      .skeleton-date {
+        height: 84px;
+      }
+
+      .skeleton-line {
+        height: 13px;
+      }
+
+      .skeleton-line:first-child {
+        width: 64%;
+        height: 20px;
+      }
+
+      .skeleton-line + .skeleton-line {
+        width: 42%;
+        margin-top: 14px;
+      }
+
+      @keyframes shimmer {
+        to {
+          transform: translateX(100%);
+        }
+      }
+
+      .source-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin: 24px 2px 0;
         color: var(--muted);
-        font-size: 0.82rem;
+        font-size: 0.78rem;
       }
 
-      .source a {
+      .source-row a {
         color: var(--accent);
+        font-weight: 750;
+        text-underline-offset: 3px;
       }
 
-      @media (max-width: 620px) {
-        .event {
-          grid-template-columns: 64px minmax(0, 1fr);
-          gap: 13px;
-          padding: 14px;
+      .source-row .freshness {
+        text-align: right;
+      }
+
+      @media (max-width: 760px) {
+        .hero-content {
+          align-items: start;
+          flex-direction: column;
         }
 
-        .arrow {
+        .count-card {
+          min-width: 0;
+        }
+
+        .controls {
+          grid-template-columns: 1fr;
+        }
+
+        .filters {
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .filters::-webkit-scrollbar {
           display: none;
         }
 
-        .date strong {
-          font-size: 1.4rem;
+        .event {
+          grid-template-columns: 72px minmax(0, 1fr);
+          gap: 14px;
+          min-height: 104px;
+          padding: 14px;
         }
 
-        .toolbar {
+        .date-box {
+          min-height: 76px;
+        }
+
+        .date-box strong {
+          font-size: 1.7rem;
+        }
+
+        .action {
+          display: none;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .hero {
+          padding: 25px 21px;
+          border-radius: 22px;
+        }
+
+        h1 {
+          font-size: 2.5rem;
+        }
+
+        .intro {
+          font-size: 0.93rem;
+          line-height: 1.55;
+        }
+
+        .count-card {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          width: 100%;
+          padding: 14px 17px;
+        }
+
+        .count-card strong,
+        .count-card span {
+          display: inline;
+          margin: 0;
+        }
+
+        .month-group + .month-group {
+          margin-top: 30px;
+        }
+
+        .event {
           align-items: start;
+        }
+
+        .meta {
+          display: grid;
+          gap: 6px;
+        }
+
+        .title {
+          font-size: 1.08rem;
+        }
+
+        .source-row {
+          align-items: start;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        .source-row .freshness {
+          text-align: left;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
@@ -177,41 +612,85 @@
 
   <body>
     <main class="widget">
-      <div class="toolbar">
-        <div>
-          <h2>Veranstaltungen</h2>
-          <p>Aktuelle Termine aus der Gemeinde Wandlitz</p>
+      <header class="hero">
+        <div class="hero-content">
+          <div>
+            <div class="eyebrow">Wandlitz erleben</div>
+            <h1>Was ist los in Wandlitz?</h1>
+            <p class="intro">
+              Entdecke Veranstaltungen, Kultur und gemeinsame Erlebnisse in der
+              Gemeinde Wandlitz.
+            </p>
+          </div>
+          <div class="count-card" aria-live="polite">
+            <strong id="event-count">–</strong>
+            <span>kommende Termine</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="controls" aria-label="Veranstaltungen filtern">
+        <label class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"></circle>
+            <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+          <input
+            id="search"
+            class="search"
+            type="search"
+            placeholder="Veranstaltung oder Ort suchen …"
+            autocomplete="off"
+          />
+        </label>
+
+        <div class="filters" role="group" aria-label="Zeitraum">
+          <button class="filter is-active" type="button" data-filter="all">Alle</button>
+          <button class="filter" type="button" data-filter="week">7 Tage</button>
+          <button class="filter" type="button" data-filter="month">Dieser Monat</button>
+        </div>
+      </section>
+
+      <div id="events" aria-live="polite">
+        <div class="events">
+          <div class="skeleton"><div class="skeleton-inner"><div class="skeleton-date"></div><div><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div></div>
+          <div class="skeleton"><div class="skeleton-inner"><div class="skeleton-date"></div><div><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div></div>
+          <div class="skeleton"><div class="skeleton-inner"><div class="skeleton-date"></div><div><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div></div>
         </div>
       </div>
 
-      <div id="events" class="events">
-        <div class="status">Veranstaltungen werden geladen …</div>
-      </div>
-
-      <p class="source">
-        Quelle:
-        <a
-          href="https://www.wandlitz.de/veranstaltungen/"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Gemeinde Wandlitz</a
-        >
-      </p>
+      <footer class="source-row">
+        <span>
+          Quelle:
+          <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Gemeinde Wandlitz</a>
+        </span>
+        <span id="freshness" class="freshness"></span>
+      </footer>
     </main>
 
     <script>
       const container = document.getElementById("events");
+      const searchInput = document.getElementById("search");
+      const countElement = document.getElementById("event-count");
+      const freshnessElement = document.getElementById("freshness");
+      const filterButtons = [...document.querySelectorAll(".filter")];
       const query = new URLSearchParams(location.search);
-      const limit = Math.min(Math.max(Number(query.get("limit")) || 20, 1), 80);
+      const limit = Math.min(Math.max(Number(query.get("limit")) || 24, 1), 80);
 
-      const dateFormatter = new Intl.DateTimeFormat("de-DE", {
-        timeZone: "Europe/Berlin",
+      let allEvents = [];
+      let activeFilter = "all";
+
+      const shortDateFormatter = new Intl.DateTimeFormat("de-DE", {
         day: "2-digit",
         month: "short"
       });
 
-      const longDateFormatter = new Intl.DateTimeFormat("de-DE", {
-        timeZone: "Europe/Berlin",
+      const monthFormatter = new Intl.DateTimeFormat("de-DE", {
+        month: "long",
+        year: "numeric"
+      });
+
+      const fullDateFormatter = new Intl.DateTimeFormat("de-DE", {
         weekday: "short",
         day: "2-digit",
         month: "2-digit",
@@ -219,11 +698,18 @@
       });
 
       function parseDate(value) {
-        return new Date(`${value}T12:00:00+02:00`);
+        const [year, month, day] = value.split("-").map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0);
+      }
+
+      function startOfToday() {
+        const value = new Date();
+        value.setHours(0, 0, 0, 0);
+        return value;
       }
 
       function escapeHtml(value = "") {
-        return value.replace(
+        return String(value).replace(
           /[&<>"']/g,
           (character) =>
             ({
@@ -236,80 +722,201 @@
         );
       }
 
+      function relativeTag(event) {
+        const today = startOfToday();
+        const date = parseDate(event.startDate);
+        const difference = Math.round((date - today) / 86400000);
+
+        if (difference === 0) return "Heute";
+        if (difference === 1) return "Morgen";
+        if (difference > 1 && difference <= 7) return "Diese Woche";
+        return "Veranstaltung";
+      }
+
       function timeLabel(event) {
-        if (!event.startTime) return "";
+        if (!event.startTime) return "Zeit siehe Details";
         return event.endTime
           ? `${event.startTime}–${event.endTime} Uhr`
           : `${event.startTime} Uhr`;
       }
 
       function dateLabel(event) {
+        const start = fullDateFormatter.format(parseDate(event.startDate));
         if (event.endDate && event.endDate !== event.startDate) {
-          return `${longDateFormatter.format(
-            parseDate(event.startDate)
-          )} – ${longDateFormatter.format(parseDate(event.endDate))}`;
+          return `${start} – ${fullDateFormatter.format(parseDate(event.endDate))}`;
         }
-        return longDateFormatter.format(parseDate(event.startDate));
+        return start;
       }
 
-      function card(event) {
-        const dateParts = dateFormatter
+      function icon(type) {
+        if (type === "clock") {
+          return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"></circle><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+        }
+        if (type === "pin") {
+          return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 10c0 5-7 10-7 10S5 15 5 10a7 7 0 1 1 14 0Z" stroke="currentColor" stroke-width="1.8"></path><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.8"></circle></svg>';
+        }
+        return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.8"></rect><path d="M8 3.5v4M16 3.5v4M4 9.5h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>';
+      }
+
+      function eventCard(event) {
+        const dateParts = shortDateFormatter
           .formatToParts(parseDate(event.startDate))
           .reduce((result, part) => {
             result[part.type] = part.value;
             return result;
           }, {});
 
-        const meta = [
-          dateLabel(event),
-          timeLabel(event),
-          event.location || ""
-        ].filter(Boolean);
+        const location = event.location
+          ? `<span class="meta-item">${icon("pin")}<span>${escapeHtml(event.location)}</span></span>`
+          : "";
 
         return `
-          <a class="event" href="${escapeHtml(
-            event.url
-          )}" target="_blank" rel="noopener noreferrer">
-            <div class="date" aria-hidden="true">
+          <a class="event" href="${escapeHtml(event.url)}" target="_blank" rel="noopener noreferrer">
+            <div class="date-box" aria-hidden="true">
               <strong>${escapeHtml(dateParts.day || "")}</strong>
               <span>${escapeHtml((dateParts.month || "").replace(".", ""))}</span>
             </div>
             <div class="details">
-              <h3 class="title">${escapeHtml(event.title)}</h3>
+              <span class="tag">${escapeHtml(relativeTag(event))}</span>
+              <h2 class="title">${escapeHtml(event.title)}</h2>
               <div class="meta">
-                ${meta
-                  .map((item) => `<span>${escapeHtml(item)}</span>`)
-                  .join("")}
+                <span class="meta-item">${icon("calendar")}<span>${escapeHtml(dateLabel(event))}</span></span>
+                <span class="meta-item">${icon("clock")}<span>${escapeHtml(timeLabel(event))}</span></span>
+                ${location}
               </div>
             </div>
-            <span class="arrow" aria-hidden="true">→</span>
+            <span class="action">
+              Details
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 12h14M14 7l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </span>
           </a>
         `;
       }
 
+      function groupByMonth(events) {
+        return events.reduce((groups, event) => {
+          const key = event.startDate.slice(0, 7);
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(event);
+          return groups;
+        }, {});
+      }
+
+      function matchesTimeFilter(event) {
+        const date = parseDate(event.startDate);
+        const today = startOfToday();
+
+        if (activeFilter === "week") {
+          const end = new Date(today);
+          end.setDate(end.getDate() + 7);
+          return date >= today && date < end;
+        }
+
+        if (activeFilter === "month") {
+          return (
+            date.getFullYear() === today.getFullYear() &&
+            date.getMonth() === today.getMonth()
+          );
+        }
+
+        return true;
+      }
+
+      function filteredEvents() {
+        const term = searchInput.value.trim().toLocaleLowerCase("de-DE");
+        return allEvents.filter((event) => {
+          const haystack = `${event.title} ${event.location || ""}`.toLocaleLowerCase("de-DE");
+          return matchesTimeFilter(event) && (!term || haystack.includes(term));
+        });
+      }
+
+      function render() {
+        const events = filteredEvents();
+        countElement.textContent = String(events.length);
+
+        if (!events.length) {
+          container.innerHTML = `
+            <div class="empty">
+              Keine passenden Veranstaltungen gefunden.<br />
+              <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Alle Termine auf wandlitz.de ansehen</a>
+            </div>
+          `;
+          reportHeight();
+          return;
+        }
+
+        const groups = groupByMonth(events);
+        container.innerHTML = Object.values(groups)
+          .map((group) => {
+            const heading = monthFormatter.format(parseDate(group[0].startDate));
+            return `
+              <section class="month-group">
+                <h2 class="month-heading">${escapeHtml(heading)}</h2>
+                <div class="events">${group.map(eventCard).join("")}</div>
+              </section>
+            `;
+          })
+          .join("");
+
+        requestAnimationFrame(reportHeight);
+      }
+
+      function applyQueryTheme() {
+        const accent = query.get("accent");
+        if (accent && /^[0-9a-f]{6}$/i.test(accent)) {
+          document.documentElement.style.setProperty("--accent", `#${accent}`);
+        }
+      }
+
+      function demoEvents() {
+        const today = startOfToday();
+        const iso = (offset) => {
+          const date = new Date(today);
+          date.setDate(date.getDate() + offset);
+          return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, "0"),
+            String(date.getDate()).padStart(2, "0")
+          ].join("-");
+        };
+
+        return [
+          { title: "Sommerkonzert am Wandlitzsee", startDate: iso(0), endDate: iso(0), startTime: "18:30", endTime: "21:00", location: "Strandbad Wandlitzsee", url: "https://www.wandlitz.de/veranstaltungen/" },
+          { title: "Regionalmarkt mit Kunst und Handwerk", startDate: iso(2), endDate: iso(2), startTime: "10:00", endTime: "16:00", location: "Dorfkern Basdorf", url: "https://www.wandlitz.de/veranstaltungen/" },
+          { title: "Familienführung durch den Naturpark", startDate: iso(6), endDate: iso(6), startTime: "11:00", endTime: null, location: "Barnim Panorama", url: "https://www.wandlitz.de/veranstaltungen/" },
+          { title: "Lesung und Gespräch am Abend", startDate: iso(12), endDate: iso(12), startTime: "19:00", endTime: null, location: "Kulturbühne Goldener Löwe", url: "https://www.wandlitz.de/veranstaltungen/" }
+        ];
+      }
+
       function reportHeight() {
         const height = Math.ceil(document.documentElement.scrollHeight);
-        parent.postMessage(
-          { type: "wandlitz-events-height", height },
-          "*"
-        );
+        parent.postMessage({ type: "wandlitz-events-height", height }, "*");
       }
 
       async function load() {
-        try {
-          const response = await fetch(`/api/events?limit=${limit}`);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        applyQueryTheme();
 
-          const data = await response.json();
-          container.innerHTML = data.events.map(card).join("");
+        try {
+          if (query.get("demo") === "1") {
+            allEvents = demoEvents();
+            freshnessElement.textContent = "Demoansicht";
+          } else {
+            const response = await fetch(`/api/events?limit=${limit}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            allEvents = data.events || [];
+            freshnessElement.textContent = "Automatisch aktualisiert";
+          }
+
+          render();
         } catch (error) {
+          countElement.textContent = "0";
           container.innerHTML = `
             <div class="status">
-              Die Termine konnten gerade nicht geladen werden.
-              <a href="https://www.wandlitz.de/veranstaltungen/"
-                 target="_blank" rel="noopener noreferrer">
-                Veranstaltungskalender direkt öffnen
-              </a>
+              Die Termine konnten gerade nicht geladen werden.<br />
+              <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Veranstaltungskalender direkt öffnen</a>
             </div>
           `;
         } finally {
@@ -317,6 +924,16 @@
           setTimeout(reportHeight, 500);
         }
       }
+
+      searchInput.addEventListener("input", render);
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          activeFilter = button.dataset.filter;
+          filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          render();
+        });
+      });
 
       window.addEventListener("resize", reportHeight);
       load();

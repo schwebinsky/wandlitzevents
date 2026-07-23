@@ -96,3 +96,16 @@ Webseiten können ihre HTML-Struktur ändern. Falls keine Termine mehr erscheine
 Vor einem öffentlichen Dauerbetrieb sollte die Gemeinde Wandlitz um Zustimmung
 zur regelmäßigen Übernahme gebeten werden. Die Quelle sollte sichtbar genannt
 und jede Veranstaltung zur Originalseite verlinkt bleiben.
+
+## Design anpassen
+
+Die modernisierte Version bietet Suche, Zeitraumfilter, Monatsgruppen und eine
+responsive Kartenansicht. Die Hauptfarbe kann direkt in der iframe-URL gesetzt
+werden:
+
+```html
+https://DEIN-PROJEKT.vercel.app/?limit=24&accent=285c3f
+```
+
+`accent` erwartet einen sechsstelligen Hexwert ohne `#`. Eine Vorschau mit
+Beispieldaten ist unter `/?demo=1` verfügbar.
