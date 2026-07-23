@@ -78,3 +78,11 @@ wird trotzdem weiter ausgegeben.
 Quellenangaben und Links zu den Originalveranstaltungen sollten sichtbar
 bleiben. Für einen dauerhaften öffentlichen Betrieb empfiehlt sich die
 Abstimmung mit den jeweiligen Seitenbetreibern.
+
+## Fehlerkorrektur in Version 5
+
+Die Wandlitz-Quelle wird nun über zwei alternative Seitenadressen und mit zwei
+Abrufprofilen versucht. Teilweise erfolgreiche Antworten werden nur zwei Minuten
+zwischengespeichert, damit ein kurzfristiger Ausfall nicht stundenlang als reine
+Bernau-Liste sichtbar bleibt. Nach dem Deployment kann der Status unter
+`/api/events?limit=20&widgetVersion=5` geprüft werden.
