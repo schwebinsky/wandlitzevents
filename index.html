@@ -971,14 +971,30 @@
             allEvents = demoEvents();
             freshnessElement.textContent = "Demoansicht";
           } else {
-            const response = await fetch(`/api/events?limit=${limit}`);
+            const response = await fetch(`/api/events?limit=${limit}&widgetVersion=5`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             allEvents = data.events || [];
-            const availableSources = (data.sources || []).filter((source) => source.ok).length;
+            const sourceStates = data.sources || [];
+            const availableSources = sourceStates.filter((source) => source.ok).length;
             freshnessElement.textContent = availableSources === 2
               ? "Beide Quellen automatisch aktualisiert"
-              : "Eine Quelle aktuell verfügbar";
+              : "Eine Quelle aktuell verfügbar – erneuter Abruf erfolgt automatisch";
+
+            sourceFilterButtons.forEach((button) => {
+              if (button.dataset.source === "all") return;
+              const source = sourceStates.find(
+                (item) => item.key === button.dataset.source
+              );
+              button.disabled = Boolean(source && !source.ok);
+              button.title = source && !source.ok
+                ? `${source.label} ist gerade nicht erreichbar`
+                : "";
+            });
+
+            if (data.warnings?.length) {
+              console.warn("Hinweise beim Veranstaltungsimport:", data.warnings);
+            }
           }
 
           render();
