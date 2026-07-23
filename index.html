@@ -971,7 +971,7 @@
             allEvents = demoEvents();
             freshnessElement.textContent = "Demoansicht";
           } else {
-            const response = await fetch(`/api/events?limit=${limit}&widgetVersion=5`);
+            const response = await fetch(`/api/events?limit=${limit}&widgetVersion=7`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             allEvents = data.events || [];

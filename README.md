@@ -86,3 +86,23 @@ Abrufprofilen versucht. Teilweise erfolgreiche Antworten werden nur zwei Minuten
 zwischengespeichert, damit ein kurzfristiger Ausfall nicht stundenlang als reine
 Bernau-Liste sichtbar bleibt. Nach dem Deployment kann der Status unter
 `/api/events?limit=20&widgetVersion=5` geprüft werden.
+
+
+## Version 6: ausgewogene Quellen
+
+Die API reserviert nun bei einem gemeinsamen Limit Plätze für jede aktive Quelle.
+Bei `limit=80` werden zunächst bis zu 40 Termine je Quelle berücksichtigt; freie
+Plätze werden anschließend chronologisch mit weiteren Terminen aufgefüllt. Dadurch
+kann eine umfangreiche Quelle die andere nicht mehr vollständig aus der Ausgabe
+verdrängen. Im API-Feld `sources` zeigt `returnedCount`, wie viele Termine jeder
+Quelle tatsächlich an das Widget übergeben wurden.
+
+
+## Version 7: stabilerer Wandlitz-Abruf
+
+Der Wandlitz-Import versucht weiterhin zuerst den direkten Abruf der offiziellen
+Seite. Falls die Seite eine Vercel-/Rechenzentrumsanfrage blockiert oder dabei
+keine Eventlinks liefert, wird als Rückfallweg die öffentliche Jina Reader API
+verwendet. Die Eventlinks führen weiterhin ausschließlich zur offiziellen
+Wandlitz-Seite. Im API-Feld `sources[].strategy` steht `direct-html` oder
+`reader-fallback`, sodass der verwendete Abrufweg sichtbar bleibt.
