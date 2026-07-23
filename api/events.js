@@ -1,9 +1,17 @@
 import * as cheerio from "cheerio";
 
-const WANDLITZ_URL =
-  process.env.WANDLITZ_SOURCE_URL || "https://www.wandlitz.de/veranstaltungen/";
+const WANDLITZ_URLS = [
+  process.env.WANDLITZ_SOURCE_URL,
+  "https://www.wandlitz.de/veranstaltungen/",
+  "https://www.wandlitz.de/veranstaltungen/index.php"
+].filter((value, index, values) => value && values.indexOf(value) === index);
+const WANDLITZ_URL = WANDLITZ_URLS[0];
 const BERNAU_URL =
   process.env.BERNAU_SOURCE_URL || "https://www.bernau-besuchen.de/veranstaltungen-2";
+
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 const DEFAULT_LIMIT = 80;
 const MAX_LIMIT = 160;
@@ -495,20 +503,56 @@ function parseBernauEvents(html) {
   return sortAndFilter(results);
 }
 
-async function fetchHtml(url, userAgent) {
+async function fetchHtml(url, userAgent = BROWSER_USER_AGENT) {
   const response = await fetch(url, {
     headers: {
       "User-Agent": userAgent,
-      Accept: "text/html,application/xhtml+xml"
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "de-DE,de;q=0.9,en;q=0.7",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      Referer: new URL(url).origin + "/"
     },
-    signal: AbortSignal.timeout(18000)
+    redirect: "follow",
+    signal: AbortSignal.timeout(20000)
   });
 
   if (!response.ok) {
     throw new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
   }
 
-  return response.text();
+  const html = await response.text();
+  if (html.length < 1000) {
+    throw new Error(`${new URL(url).hostname} returned an unexpectedly short page`);
+  }
+
+  return html;
+}
+
+async function fetchAndParseSource(source) {
+  const failures = [];
+  const urls = source.urls || [source.url];
+  const userAgents = source.userAgents || [BROWSER_USER_AGENT];
+
+  for (const url of urls) {
+    for (const userAgent of userAgents) {
+      try {
+        const html = await fetchHtml(url, userAgent);
+        const events = source.parser(html);
+
+        if (events.length) {
+          return { source, events, fetchedUrl: url };
+        }
+
+        failures.push(`${url}: Seite geladen, aber keine Termine erkannt`);
+      } catch (error) {
+        failures.push(`${url}: ${String(error?.message || error)}`);
+      }
+    }
+  }
+
+  throw new Error(failures.join(" | "));
 }
 
 function dedupeMergedEvents(events) {
@@ -547,24 +591,24 @@ export default async function handler(req, res) {
       key: "wandlitz",
       label: "Gemeinde Wandlitz",
       url: WANDLITZ_URL,
+      urls: WANDLITZ_URLS,
+      userAgents: [
+        BROWSER_USER_AGENT,
+        "WandlitzEventsWidget/1.0 (+public event list; cached server-side)"
+      ],
       parser: parseWandlitzEvents
     },
     {
       key: "bernau",
       label: "Tourist-Information Bernau",
       url: BERNAU_URL,
+      urls: [BERNAU_URL],
       parser: parseBernauEvents
     }
   ];
 
   const settled = await Promise.allSettled(
-    sourceJobs.map(async (source) => {
-      const html = await fetchHtml(
-        source.url,
-        `RegionalEventsWidget/2.0 (+public event list; cached server-side; source=${source.key})`
-      );
-      return { source, events: source.parser(html) };
-    })
+    sourceJobs.map((source) => fetchAndParseSource(source))
   );
 
   const events = [];
@@ -579,6 +623,7 @@ export default async function handler(req, res) {
         key: source.key,
         label: source.label,
         url: source.url,
+        fetchedUrl: result.value.fetchedUrl,
         count: result.value.events.length,
         ok: true
       });
@@ -615,10 +660,13 @@ export default async function handler(req, res) {
 
   res.setHeader(
     "Cache-Control",
-    "public, s-maxage=21600, stale-while-revalidate=86400"
+    warnings.length
+      ? "public, s-maxage=120, stale-while-revalidate=300"
+      : "public, s-maxage=21600, stale-while-revalidate=86400"
   );
 
   return res.status(200).json({
+    version: "5.0.0",
     fetchedAt: new Date().toISOString(),
     count: merged.length,
     sources,
