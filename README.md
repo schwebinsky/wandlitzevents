@@ -1,111 +1,80 @@
-# Wandlitz-Veranstaltungen für Squarespace
+# Veranstaltungs-Widget für Wandlitz und Bernau
 
-Dieses Starterprojekt liest die öffentliche Veranstaltungsliste der Gemeinde
-Wandlitz serverseitig aus und stellt sie als responsives Widget bereit.
+Dieses Projekt liest öffentliche Veranstaltungstermine aus zwei Quellen aus und
+zeigt sie gemeinsam in einem responsiven Squarespace-Widget:
 
-## Warum ein externes Widget?
+- Gemeinde Wandlitz: `https://www.wandlitz.de/veranstaltungen/`
+- Tourist-Information Bernau: `https://www.bernau-besuchen.de/veranstaltungen-2`
 
-Squarespace bietet keine dokumentierte öffentliche API, mit der normale
-Kalender-/Event-Einträge automatisiert angelegt und aktualisiert werden können.
-Ein eingebettetes Widget ist deshalb stabiler als Browser-Automatisierung im
-Squarespace-Backend.
+## Was neu ist
 
-## Funktionsweise
+- beide Quellen werden parallel geladen
+- fällt eine Quelle vorübergehend aus, bleibt die andere sichtbar
+- Termine werden nach Datum und Uhrzeit zusammengeführt
+- jede Karte zeigt die Herkunft `Wandlitz` oder `Bernau`
+- zusätzlicher Regionsfilter: Alle Orte, Wandlitz oder Bernau
+- Suche berücksichtigt Titel, Ort und Quelle
+- Ergebnisse werden sechs Stunden gecacht
 
-1. `/api/events` lädt `https://www.wandlitz.de/veranstaltungen/`.
-2. Die Event-Links werden anhand ihrer URL-Struktur erkannt.
-3. Titel, Datum, Uhrzeit und Veranstaltungsort werden extrahiert.
-4. Vercel cached die Antwort sechs Stunden.
-5. `index.html` zeigt die Termine als responsive Liste.
-6. Squarespace bindet das Widget per `iframe` ein.
+## Aktualisierung bei GitHub
 
-Das Widget kopiert bewusst keine Beschreibungstexte oder Bilder. Dadurch bleibt
-die Darstellung kompakt, vermeidet unnötiges Hotlinking und führt für Details
-immer zur Originalquelle.
+1. Den Inhalt dieses Ordners öffnen.
+2. Im bestehenden GitHub-Repository `Add file > Upload files` wählen.
+3. Alle Dateien und den Ordner `api` hochladen.
+4. Vorhandene Dateien überschreiben lassen.
+5. Einen Commit erstellen, zum Beispiel `Bernau-Termine ergänzt`.
+6. Vercel startet danach automatisch ein neues Deployment.
 
-## Deployment auf Vercel
+## Testen
 
-1. Kostenloses Konto bei Vercel erstellen.
-2. Diesen Ordner in ein neues GitHub-Repository hochladen.
-3. In Vercel `Add New > Project` wählen und das Repository importieren.
-4. Framework Preset: `Other`.
-5. Deploy ausführen.
-6. Die erzeugte URL öffnen und prüfen.
-
-Alternativ mit der Vercel-CLI:
-
-```bash
-npm install
-npx vercel
-```
-
-## In Squarespace einbauen
-
-Voraussetzung: Ein Squarespace-Tarif, der JavaScript und iframes in Code-Blöcken
-unterstützt.
-
-1. Eine normale Squarespace-Seite öffnen.
-2. `Bearbeiten > Block hinzufügen > Code`.
-3. Als Typ `HTML` wählen.
-4. Den Inhalt aus `squarespace-embed.html` einfügen.
-5. `https://DEIN-PROJEKT.vercel.app/` durch deine Vercel-URL ersetzen.
-6. Speichern und die Seite ausgeloggt bzw. im Inkognito-Fenster testen.
-
-Mit `?limit=20` bestimmst du die maximale Anzahl angezeigter Termine.
-
-## Aktualisierungsintervall
-
-Der API-Endpunkt setzt:
+Nach dem Deployment zuerst den API-Endpunkt öffnen:
 
 ```text
-s-maxage=21600
+https://DEIN-PROJEKT.vercel.app/api/events?limit=20
 ```
 
-Damit wird die Quelle höchstens alle sechs Stunden neu geladen. Das schützt die
-Wandlitz-Seite vor unnötigen Abrufen. Für ein anderes Intervall den Wert in
-`api/events.js` ändern.
+Die JSON-Antwort sollte unter `sources` beide Quellen und unter `events`
+Termine mit `sourceKey: "wandlitz"` beziehungsweise `sourceKey: "bernau"`
+enthalten.
 
-Beispiele:
+Danach das Widget öffnen:
 
-- 1 Stunde: `s-maxage=3600`
-- 12 Stunden: `s-maxage=43200`
-- 24 Stunden: `s-maxage=86400`
-
-## Anpassungen
-
-Farben, Abstände und Schriftgrößen stehen am Anfang von `index.html` als
-CSS-Variablen:
-
-```css
---surface: #ffffff;
---text: #172019;
---muted: #66706a;
---line: #dfe5e1;
---accent: #215c39;
---accent-soft: #edf5ef;
+```text
+https://DEIN-PROJEKT.vercel.app/?limit=80
 ```
 
-## Betrieb und Wartung
+Eine Vorschau mit lokalen Beispieldaten ist weiterhin verfügbar:
 
-Webseiten können ihre HTML-Struktur ändern. Falls keine Termine mehr erscheinen:
+```text
+https://DEIN-PROJEKT.vercel.app/?demo=1
+```
 
-1. Vercel-Logs prüfen.
-2. `/api/events?limit=5` direkt öffnen.
-3. Die Selektions- und Erkennungslogik in `api/events.js` anpassen.
+## Squarespace
 
-Vor einem öffentlichen Dauerbetrieb sollte die Gemeinde Wandlitz um Zustimmung
-zur regelmäßigen Übernahme gebeten werden. Die Quelle sollte sichtbar genannt
-und jede Veranstaltung zur Originalseite verlinkt bleiben.
+Der vorhandene Code-Block kann grundsätzlich unverändert bleiben, wenn er
+bereits dieselbe Vercel-Adresse einbindet. Empfehlenswert ist `limit=80`, weil
+die Bernauer Quelle deutlich mehr Termine enthält.
 
-## Design anpassen
+Der vollständige Einbettungscode steht in `squarespace-embed.html`.
 
-Die modernisierte Version bietet Suche, Zeitraumfilter, Monatsgruppen und eine
-responsive Kartenansicht. Die Hauptfarbe kann direkt in der iframe-URL gesetzt
+## Konfiguration
+
+Die Quelladressen können in Vercel über Umgebungsvariablen überschrieben
 werden:
 
-```html
-https://DEIN-PROJEKT.vercel.app/?limit=24&accent=285c3f
+```text
+WANDLITZ_SOURCE_URL
+BERNAU_SOURCE_URL
 ```
 
-`accent` erwartet einen sechsstelligen Hexwert ohne `#`. Eine Vorschau mit
-Beispieldaten ist unter `/?demo=1` verfügbar.
+Ohne diese Variablen werden automatisch die oben genannten URLs verwendet.
+
+## Wartung
+
+Webseiten können ihre HTML-Struktur ändern. Wenn eine Quelle nicht mehr geladen
+wird, liefert `/api/events` im Feld `warnings` einen Hinweis. Die andere Quelle
+wird trotzdem weiter ausgegeben.
+
+Quellenangaben und Links zu den Originalveranstaltungen sollten sichtbar
+bleiben. Für einen dauerhaften öffentlichen Betrieb empfiehlt sich die
+Abstimmung mit den jeweiligen Seitenbetreibern.

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
-    <title>Veranstaltungen in Wandlitz</title>
+    <title>Veranstaltungen in Wandlitz und Bernau</title>
     <style>
       :root {
         color-scheme: light;
@@ -160,6 +160,23 @@
         grid-template-columns: minmax(210px, 1fr) auto;
         gap: 14px;
         margin: 24px 0 34px;
+      }
+
+      .source-filter-row {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .filter-label {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
       .search-wrap {
@@ -330,18 +347,43 @@
         min-width: 0;
       }
 
-      .tag {
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-bottom: 7px;
+      }
+
+      .tag,
+      .source-pill {
         display: inline-flex;
         align-items: center;
-        margin-bottom: 7px;
         padding: 5px 9px;
         border-radius: 999px;
-        background: var(--surface-soft);
-        color: var(--accent-dark);
         font-size: 0.68rem;
         font-weight: 850;
         letter-spacing: 0.06em;
         text-transform: uppercase;
+      }
+
+      .tag {
+        background: var(--surface-soft);
+        color: var(--accent-dark);
+      }
+
+      .source-pill {
+        background: #eef2f6;
+        color: #4d5f70;
+      }
+
+      .source-pill.source-wandlitz {
+        background: var(--accent-soft);
+        color: var(--accent-dark);
+      }
+
+      .source-pill.source-bernau {
+        background: #eef0fb;
+        color: #4f5687;
       }
 
       .title {
@@ -513,6 +555,13 @@
           grid-template-columns: 1fr;
         }
 
+        .source-filter-row {
+          grid-column: 1;
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 8px;
+        }
+
         .filters {
           overflow-x: auto;
           scrollbar-width: none;
@@ -617,11 +666,11 @@
       <header class="hero">
         <div class="hero-content">
           <div>
-            <div class="eyebrow">Wandlitz erleben</div>
-            <h1>Was ist los in Wandlitz?</h1>
+            <div class="eyebrow">Wandlitz &amp; Bernau erleben</div>
+            <h1>Was ist los in Wandlitz &amp; Bernau?</h1>
             <p class="intro">
-              Entdecke Veranstaltungen, Kultur und gemeinsame Erlebnisse in der
-              Gemeinde Wandlitz.
+              Entdecke Veranstaltungen, Kultur und gemeinsame Erlebnisse aus
+              Wandlitz und Bernau bei Berlin.
             </p>
           </div>
           <div class="count-card" aria-live="polite">
@@ -647,9 +696,18 @@
         </label>
 
         <div class="filters" role="group" aria-label="Zeitraum">
-          <button class="filter is-active" type="button" data-filter="all">Alle</button>
-          <button class="filter" type="button" data-filter="week">7 Tage</button>
-          <button class="filter" type="button" data-filter="month">Dieser Monat</button>
+          <button class="filter time-filter is-active" type="button" data-filter="all">Alle</button>
+          <button class="filter time-filter" type="button" data-filter="week">7 Tage</button>
+          <button class="filter time-filter" type="button" data-filter="month">Dieser Monat</button>
+        </div>
+
+        <div class="source-filter-row">
+          <span class="filter-label">Region</span>
+          <div class="filters" role="group" aria-label="Region">
+            <button class="filter source-filter is-active" type="button" data-source="all">Alle Orte</button>
+            <button class="filter source-filter" type="button" data-source="wandlitz">Wandlitz</button>
+            <button class="filter source-filter" type="button" data-source="bernau">Bernau</button>
+          </div>
         </div>
       </section>
 
@@ -663,8 +721,10 @@
 
       <footer class="source-row">
         <span>
-          Quelle:
+          Quellen:
           <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Gemeinde Wandlitz</a>
+          ·
+          <a href="https://www.bernau-besuchen.de/veranstaltungen-2" target="_blank" rel="noopener noreferrer">Tourist-Information Bernau</a>
         </span>
         <span id="freshness" class="freshness"></span>
       </footer>
@@ -675,12 +735,14 @@
       const searchInput = document.getElementById("search");
       const countElement = document.getElementById("event-count");
       const freshnessElement = document.getElementById("freshness");
-      const filterButtons = [...document.querySelectorAll(".filter")];
+      const timeFilterButtons = [...document.querySelectorAll(".time-filter")];
+      const sourceFilterButtons = [...document.querySelectorAll(".source-filter")];
       const query = new URLSearchParams(location.search);
-      const limit = Math.min(Math.max(Number(query.get("limit")) || 24, 1), 80);
+      const limit = Math.min(Math.max(Number(query.get("limit")) || 80, 1), 160);
 
       let allEvents = [];
       let activeFilter = "all";
+      let activeSource = "all";
 
       const shortDateFormatter = new Intl.DateTimeFormat("de-DE", {
         day: "2-digit",
@@ -779,7 +841,10 @@
               <span>${escapeHtml((dateParts.month || "").replace(".", ""))}</span>
             </div>
             <div class="details">
-              <span class="tag">${escapeHtml(relativeTag(event))}</span>
+              <div class="tag-row">
+                <span class="tag">${escapeHtml(relativeTag(event))}</span>
+                <span class="source-pill source-${escapeHtml(event.sourceKey || "")}">${escapeHtml(event.sourceKey === "bernau" ? "Bernau" : "Wandlitz")}</span>
+              </div>
               <h2 class="title">${escapeHtml(event.title)}</h2>
               <div class="meta">
                 <span class="meta-item">${icon("calendar")}<span>${escapeHtml(dateLabel(event))}</span></span>
@@ -829,8 +894,9 @@
       function filteredEvents() {
         const term = searchInput.value.trim().toLocaleLowerCase("de-DE");
         return allEvents.filter((event) => {
-          const haystack = `${event.title} ${event.location || ""}`.toLocaleLowerCase("de-DE");
-          return matchesTimeFilter(event) && (!term || haystack.includes(term));
+          const haystack = `${event.title} ${event.location || ""} ${event.source || ""}`.toLocaleLowerCase("de-DE");
+          const matchesSource = activeSource === "all" || event.sourceKey === activeSource;
+          return matchesTimeFilter(event) && matchesSource && (!term || haystack.includes(term));
         });
       }
 
@@ -842,7 +908,7 @@
           container.innerHTML = `
             <div class="empty">
               Keine passenden Veranstaltungen gefunden.<br />
-              <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Alle Termine auf wandlitz.de ansehen</a>
+              Nutze die Regions- oder Zeitraumfilter, um die Auswahl anzupassen.
             </div>
           `;
           reportHeight();
@@ -885,10 +951,10 @@
         };
 
         return [
-          { title: "Sommerkonzert am Wandlitzsee", startDate: iso(0), endDate: iso(0), startTime: "18:30", endTime: "21:00", location: "Strandbad Wandlitzsee", url: "https://www.wandlitz.de/veranstaltungen/" },
-          { title: "Regionalmarkt mit Kunst und Handwerk", startDate: iso(2), endDate: iso(2), startTime: "10:00", endTime: "16:00", location: "Dorfkern Basdorf", url: "https://www.wandlitz.de/veranstaltungen/" },
-          { title: "Familienführung durch den Naturpark", startDate: iso(6), endDate: iso(6), startTime: "11:00", endTime: null, location: "Barnim Panorama", url: "https://www.wandlitz.de/veranstaltungen/" },
-          { title: "Lesung und Gespräch am Abend", startDate: iso(12), endDate: iso(12), startTime: "19:00", endTime: null, location: "Kulturbühne Goldener Löwe", url: "https://www.wandlitz.de/veranstaltungen/" }
+          { title: "Sommerkonzert am Wandlitzsee", startDate: iso(0), endDate: iso(0), startTime: "18:30", endTime: "21:00", location: "Strandbad Wandlitzsee", url: "https://www.wandlitz.de/veranstaltungen/", source: "Gemeinde Wandlitz", sourceKey: "wandlitz" },
+          { title: "Klassische Stadtführung", startDate: iso(1), endDate: iso(1), startTime: "11:30", endTime: "13:00", location: "Tourist-Information Bernau", url: "https://www.bernau-besuchen.de/veranstaltungen-2", source: "Tourist-Information Bernau", sourceKey: "bernau" },
+          { title: "Regionalmarkt mit Kunst und Handwerk", startDate: iso(2), endDate: iso(2), startTime: "10:00", endTime: "16:00", location: "Dorfkern Basdorf", url: "https://www.wandlitz.de/veranstaltungen/", source: "Gemeinde Wandlitz", sourceKey: "wandlitz" },
+          { title: "Musik im Korb", startDate: iso(6), endDate: iso(6), startTime: "10:30", endTime: "11:30", location: "Neues Rathaus Bernau", url: "https://www.bernau-besuchen.de/veranstaltungen-2", source: "Tourist-Information Bernau", sourceKey: "bernau" }
         ];
       }
 
@@ -909,7 +975,10 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             allEvents = data.events || [];
-            freshnessElement.textContent = "Automatisch aktualisiert";
+            const availableSources = (data.sources || []).filter((source) => source.ok).length;
+            freshnessElement.textContent = availableSources === 2
+              ? "Beide Quellen automatisch aktualisiert"
+              : "Eine Quelle aktuell verfügbar";
           }
 
           render();
@@ -918,7 +987,9 @@
           container.innerHTML = `
             <div class="status">
               Die Termine konnten gerade nicht geladen werden.<br />
-              <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Veranstaltungskalender direkt öffnen</a>
+              <a href="https://www.wandlitz.de/veranstaltungen/" target="_blank" rel="noopener noreferrer">Wandlitz öffnen</a>
+              ·
+              <a href="https://www.bernau-besuchen.de/veranstaltungen-2" target="_blank" rel="noopener noreferrer">Bernau öffnen</a>
             </div>
           `;
         } finally {
@@ -929,10 +1000,18 @@
 
       searchInput.addEventListener("input", render);
 
-      filterButtons.forEach((button) => {
+      timeFilterButtons.forEach((button) => {
         button.addEventListener("click", () => {
           activeFilter = button.dataset.filter;
-          filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          timeFilterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+          render();
+        });
+      });
+
+      sourceFilterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          activeSource = button.dataset.source;
+          sourceFilterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
           render();
         });
       });
