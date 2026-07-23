@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Veranstaltungen in Wandlitz</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: transparent;
+        --surface: #ffffff;
+        --text: #172019;
+        --muted: #66706a;
+        --line: #dfe5e1;
+        --accent: #215c39;
+        --accent-soft: #edf5ef;
+        --radius: 16px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .widget {
+        width: 100%;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .toolbar h2 {
+        margin: 0;
+        font-size: clamp(1.5rem, 3vw, 2.25rem);
+        line-height: 1.05;
+      }
+
+      .toolbar p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .events {
+        display: grid;
+        gap: 12px;
+      }
+
+      .event {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: center;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        text-decoration: none;
+        transition:
+          transform 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease;
+      }
+
+      .event:hover,
+      .event:focus-visible {
+        transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+        box-shadow: 0 10px 28px rgb(0 0 0 / 8%);
+        outline: none;
+      }
+
+      .date {
+        display: grid;
+        justify-items: center;
+        padding: 10px 6px;
+        border-radius: 12px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .date strong {
+        font-size: 1.65rem;
+        line-height: 1;
+      }
+
+      .date span {
+        margin-top: 4px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .details {
+        min-width: 0;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 1.05rem;
+        line-height: 1.3;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px 14px;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .arrow {
+        color: var(--accent);
+        font-size: 1.35rem;
+        line-height: 1;
+      }
+
+      .status {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        color: var(--muted);
+        background: var(--surface);
+      }
+
+      .source {
+        margin: 16px 2px 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .source a {
+        color: var(--accent);
+      }
+
+      @media (max-width: 620px) {
+        .event {
+          grid-template-columns: 64px minmax(0, 1fr);
+          gap: 13px;
+          padding: 14px;
+        }
+
+        .arrow {
+          display: none;
+        }
+
+        .date strong {
+          font-size: 1.4rem;
+        }
+
+        .toolbar {
+          align-items: start;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="widget">
+      <div class="toolbar">
+        <div>
+          <h2>Veranstaltungen</h2>
+          <p>Aktuelle Termine aus der Gemeinde Wandlitz</p>
+        </div>
+      </div>
+
+      <div id="events" class="events">
+        <div class="status">Veranstaltungen werden geladen …</div>
+      </div>
+
+      <p class="source">
+        Quelle:
+        <a
+          href="https://www.wandlitz.de/veranstaltungen/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Gemeinde Wandlitz</a
+        >
+      </p>
+    </main>
+
+    <script>
+      const container = document.getElementById("events");
+      const query = new URLSearchParams(location.search);
+      const limit = Math.min(Math.max(Number(query.get("limit")) || 20, 1), 80);
+
+      const dateFormatter = new Intl.DateTimeFormat("de-DE", {
+        timeZone: "Europe/Berlin",
+        day: "2-digit",
+        month: "short"
+      });
+
+      const longDateFormatter = new Intl.DateTimeFormat("de-DE", {
+        timeZone: "Europe/Berlin",
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+
+      function parseDate(value) {
+        return new Date(`${value}T12:00:00+02:00`);
+      }
+
+      function escapeHtml(value = "") {
+        return value.replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#039;"
+            })[character]
+        );
+      }
+
+      function timeLabel(event) {
+        if (!event.startTime) return "";
+        return event.endTime
+          ? `${event.startTime}–${event.endTime} Uhr`
+          : `${event.startTime} Uhr`;
+      }
+
+      function dateLabel(event) {
+        if (event.endDate && event.endDate !== event.startDate) {
+          return `${longDateFormatter.format(
+            parseDate(event.startDate)
+          )} – ${longDateFormatter.format(parseDate(event.endDate))}`;
+        }
+        return longDateFormatter.format(parseDate(event.startDate));
+      }
+
+      function card(event) {
+        const dateParts = dateFormatter
+          .formatToParts(parseDate(event.startDate))
+          .reduce((result, part) => {
+            result[part.type] = part.value;
+            return result;
+          }, {});
+
+        const meta = [
+          dateLabel(event),
+          timeLabel(event),
+          event.location || ""
+        ].filter(Boolean);
+
+        return `
+          <a class="event" href="${escapeHtml(
+            event.url
+          )}" target="_blank" rel="noopener noreferrer">
+            <div class="date" aria-hidden="true">
+              <strong>${escapeHtml(dateParts.day || "")}</strong>
+              <span>${escapeHtml((dateParts.month || "").replace(".", ""))}</span>
+            </div>
+            <div class="details">
+              <h3 class="title">${escapeHtml(event.title)}</h3>
+              <div class="meta">
+                ${meta
+                  .map((item) => `<span>${escapeHtml(item)}</span>`)
+                  .join("")}
+              </div>
+            </div>
+            <span class="arrow" aria-hidden="true">→</span>
+          </a>
+        `;
+      }
+
+      function reportHeight() {
+        const height = Math.ceil(document.documentElement.scrollHeight);
+        parent.postMessage(
+          { type: "wandlitz-events-height", height },
+          "*"
+        );
+      }
+
+      async function load() {
+        try {
+          const response = await fetch(`/api/events?limit=${limit}`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const data = await response.json();
+          container.innerHTML = data.events.map(card).join("");
+        } catch (error) {
+          container.innerHTML = `
+            <div class="status">
+              Die Termine konnten gerade nicht geladen werden.
+              <a href="https://www.wandlitz.de/veranstaltungen/"
+                 target="_blank" rel="noopener noreferrer">
+                Veranstaltungskalender direkt öffnen
+              </a>
+            </div>
+          `;
+        } finally {
+          requestAnimationFrame(reportHeight);
+          setTimeout(reportHeight, 500);
+        }
+      }
+
+      window.addEventListener("resize", reportHeight);
+      load();
+    </script>
+  </body>
+</html>
