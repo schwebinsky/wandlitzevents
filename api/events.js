@@ -1,13 +1,18 @@
 import * as cheerio from "cheerio";
 
-const SOURCE_URL =
-  process.env.SOURCE_URL || "https://www.wandlitz.de/veranstaltungen/";
-const SOURCE_ORIGIN = new URL(SOURCE_URL).origin;
-const DEFAULT_LIMIT = 30;
-const MAX_LIMIT = 80;
+const WANDLITZ_URL =
+  process.env.WANDLITZ_SOURCE_URL || "https://www.wandlitz.de/veranstaltungen/";
+const BERNAU_URL =
+  process.env.BERNAU_SOURCE_URL || "https://www.bernau-besuchen.de/veranstaltungen-2";
 
-const EVENT_PATH_RE =
+const DEFAULT_LIMIT = 80;
+const MAX_LIMIT = 160;
+
+const WANDLITZ_EVENT_PATH_RE =
   /\/veranstaltungen\/\d+\/(\d{4})\/(\d{2})\/(\d{2})\/[^?#]+\.html/i;
+const BERNAU_EVENT_PATH_RE = /\/veranstaltungen\/(?!index\.html)[^/?#]+\.html$/i;
+const GERMAN_DATE_RE =
+  /^(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag),?\s*(\d{1,2})\.\s*([A-Za-zÄÖÜäöüß]+)\s*(\d{4})$/i;
 
 const MONTHS = {
   jan: 1,
@@ -37,18 +42,40 @@ const MONTHS = {
   dezember: 12
 };
 
+const BERNAU_CATEGORIES = new Set(
+  [
+    "ausstellung",
+    "begegnung",
+    "essen und trinken",
+    "familien",
+    "führung / besichtigung",
+    "gesundheit / wellness",
+    "gottesdienste",
+    "kinder und jugendliche",
+    "klassisches konzert/oper",
+    "konzert",
+    "kurse",
+    "lesung",
+    "markt",
+    "sport",
+    "theater / tanz / kabarett / musical",
+    "und sonst",
+    "workshop"
+  ].map((value) => value.toLocaleLowerCase("de-DE"))
+);
+
 function normalize(value = "") {
-  return value
+  return String(value)
     .replace(/\u200b|\u00ad/g, "")
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function absoluteUrl(value) {
+function absoluteUrl(value, baseUrl) {
   if (!value) return null;
   try {
-    return new URL(value, SOURCE_URL).href;
+    return new URL(value, baseUrl).href;
   } catch {
     return null;
   }
@@ -73,10 +100,19 @@ function isoDate(year, month, day) {
   )}-${String(day).padStart(2, "0")}`;
 }
 
-function dateFromEventUrl(url) {
-  const match = new URL(url).pathname.match(EVENT_PATH_RE);
+function monthNumber(value) {
+  const key = normalize(value)
+    .toLocaleLowerCase("de-DE")
+    .replace(/\./g, "");
+  return MONTHS[key] || MONTHS[key.slice(0, 3)] || null;
+}
+
+function parseGermanHeadingDate(text) {
+  const match = normalize(text).match(GERMAN_DATE_RE);
   if (!match) return null;
-  return isoDate(Number(match[1]), Number(match[2]), Number(match[3]));
+  const month = monthNumber(match[2]);
+  if (!month) return null;
+  return isoDate(Number(match[3]), month, Number(match[1]));
 }
 
 function parseLastGermanDate(text, fallbackStartDate) {
@@ -89,12 +125,7 @@ function parseLastGermanDate(text, fallbackStartDate) {
   if (!matches.length) return fallbackStartDate;
 
   const last = matches[matches.length - 1];
-  const monthKey = last[2]
-    .toLocaleLowerCase("de-DE")
-    .replace(/\./g, "")
-    .replace("ä", "ä");
-
-  const month = MONTHS[monthKey] || MONTHS[monthKey.slice(0, 3)];
+  const month = monthNumber(last[2]);
   if (!month) return fallbackStartDate;
 
   return isoDate(Number(last[3]), month, Number(last[1]));
@@ -102,26 +133,60 @@ function parseLastGermanDate(text, fallbackStartDate) {
 
 function parseTimes(text) {
   const match = normalize(text).match(
-    /(\d{1,2}:\d{2})(?:\s*(?:–|—|-|bis)\s*(\d{1,2}:\d{2}))?\s*Uhr?/i
+    /(\d{1,2}:\d{2})(?:\s*(?:–|—|-|bis)\s*(\d{1,2}:\d{2}))?\s*(?:Uhr)?/i
   );
-  if (!match) return { startTime: null, endTime: null };
+  if (!match) return { startTime: null, endTime: null, match: null };
 
   return {
     startTime: match[1].padStart(5, "0"),
-    endTime: match[2] ? match[2].padStart(5, "0") : null
+    endTime: match[2] ? match[2].padStart(5, "0") : null,
+    match
   };
 }
 
-function isEventHref(href) {
+function eventSortKey(event) {
+  return `${event.startDate}T${event.startTime || "00:00"}|${event.title}`;
+}
+
+function sortAndFilter(events) {
+  const today = berlinToday();
+  return events
+    .filter((event) => (event.endDate || event.startDate) >= today)
+    .sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b), "de"));
+}
+
+function leafTextLines($, container) {
+  const lines = [];
+  const seen = new Set();
+
+  container.find("*").each((_, element) => {
+    const item = $(element);
+    if (item.children().length) return;
+    const value = normalize(item.text());
+    if (!value || value.length > 260 || seen.has(value)) return;
+    seen.add(value);
+    lines.push(value);
+  });
+
+  return lines;
+}
+
+function dateFromWandlitzUrl(url) {
+  const match = new URL(url).pathname.match(WANDLITZ_EVENT_PATH_RE);
+  if (!match) return null;
+  return isoDate(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+function isWandlitzEventHref(href) {
   if (!href) return false;
   try {
-    return EVENT_PATH_RE.test(new URL(href, SOURCE_URL).pathname);
+    return WANDLITZ_EVENT_PATH_RE.test(new URL(href, WANDLITZ_URL).pathname);
   } catch {
     return false;
   }
 }
 
-function chooseCard($, link) {
+function chooseWandlitzCard($, link) {
   let node = $(link);
   let best = node.parent();
 
@@ -132,13 +197,9 @@ function chooseCard($, link) {
     const text = normalize(node.text());
     const eventLinkCount = node
       .find("a[href]")
-      .filter((_, a) => isEventHref($(a).attr("href"))).length;
+      .filter((_, anchor) => isWandlitzEventHref($(anchor).attr("href"))).length;
 
-    if (
-      eventLinkCount === 1 &&
-      text.length >= 20 &&
-      text.length <= 1600
-    ) {
+    if (eventLinkCount === 1 && text.length >= 20 && text.length <= 1600) {
       best = node;
       if (
         node.is("article, li") ||
@@ -152,24 +213,7 @@ function chooseCard($, link) {
   return best;
 }
 
-function elementLines($, container) {
-  const lines = [];
-  const seen = new Set();
-
-  container
-    .find("h1,h2,h3,h4,p,time,address,li,span,a")
-    .each((_, element) => {
-      const item = $(element);
-      const value = normalize(item.clone().children().remove().end().text());
-      if (!value || value.length > 240 || seen.has(value)) return;
-      seen.add(value);
-      lines.push(value);
-    });
-
-  return lines;
-}
-
-function looksLikeMetadata(line, title) {
+function looksLikeWandlitzMetadata(line, title) {
   if (!line) return true;
   const lower = line.toLocaleLowerCase("de-DE");
 
@@ -186,7 +230,7 @@ function looksLikeMetadata(line, title) {
   );
 }
 
-function extractLocation($, link, card, title) {
+function extractWandlitzLocation($, link, card, title) {
   const heading = $(link).closest("h1,h2,h3,h4");
 
   if (heading.length) {
@@ -200,7 +244,7 @@ function extractLocation($, link, card, title) {
       });
 
     const siblingLocation = siblingCandidates.find(
-      (line) => !looksLikeMetadata(line, title)
+      (line) => !looksLikeWandlitzMetadata(line, title)
     );
     if (siblingLocation) return siblingLocation;
   }
@@ -217,27 +261,27 @@ function extractLocation($, link, card, title) {
       (candidate) =>
         candidate.text &&
         candidate.text.length <= 180 &&
-        !isEventHref(candidate.href) &&
-        !looksLikeMetadata(candidate.text, title)
+        !isWandlitzEventHref(candidate.href) &&
+        !looksLikeWandlitzMetadata(candidate.text, title)
     );
 
   if (laterLinks.length) return laterLinks[0].text;
 
   return (
-    elementLines($, card).find(
+    leafTextLines($, card).find(
       (line) =>
-        !looksLikeMetadata(line, title) &&
+        !looksLikeWandlitzMetadata(line, title) &&
         !/^(ausflüge|ausstellungen|familie|kino|sport|sonstiges)$/i.test(line)
     ) || null
   );
 }
 
-function extractImage($, card) {
+function extractWandlitzImage($, card) {
   const images = card.find("img[src], img[data-src]").toArray();
 
   for (const image of images) {
     const src = $(image).attr("src") || $(image).attr("data-src");
-    const url = absoluteUrl(src);
+    const url = absoluteUrl(src, WANDLITZ_URL);
     if (!url) continue;
     if (/layout\.verwaltungsportal\.de\/global\//i.test(url)) continue;
     return url;
@@ -246,55 +290,245 @@ function extractImage($, card) {
   return null;
 }
 
-function parseEvents(html) {
+function parseWandlitzEvents(html) {
   const $ = cheerio.load(html);
   const results = [];
   const seen = new Set();
 
   $("a[href]").each((_, link) => {
     const href = $(link).attr("href");
-    if (!isEventHref(href)) return;
+    if (!isWandlitzEventHref(href)) return;
 
-    const url = absoluteUrl(href);
+    const url = absoluteUrl(href, WANDLITZ_URL);
     if (!url || seen.has(url)) return;
     seen.add(url);
 
     const title = normalize($(link).text());
     if (!title || title.length < 2) return;
 
-    const card = chooseCard($, link);
+    const card = chooseWandlitzCard($, link);
     const cardText = normalize(card.text());
-    const startDate = dateFromEventUrl(url);
+    const startDate = dateFromWandlitzUrl(url);
     if (!startDate) return;
 
     const endDate = parseLastGermanDate(cardText, startDate);
     const { startTime, endTime } = parseTimes(cardText);
-    const location = extractLocation($, link, card, title);
 
     results.push({
-      id: url.match(/\/veranstaltungen\/(\d+)\//)?.[1] || url,
+      id: `wandlitz:${url.match(/\/veranstaltungen\/(\d+)\//)?.[1] || url}`,
       title,
       startDate,
       endDate,
       startTime,
       endTime,
-      location,
+      location: extractWandlitzLocation($, link, card, title),
       url,
-      image: extractImage($, card),
-      source: "Gemeinde Wandlitz"
+      image: extractWandlitzImage($, card),
+      source: "Gemeinde Wandlitz",
+      sourceKey: "wandlitz"
     });
   });
 
-  const today = berlinToday();
-
-  return results
-    .filter((event) => (event.endDate || event.startDate) >= today)
-    .sort((a, b) => {
-      const left = `${a.startDate}T${a.startTime || "00:00"}`;
-      const right = `${b.startDate}T${b.startTime || "00:00"}`;
-      return left.localeCompare(right);
-    });
+  return sortAndFilter(results);
 }
+
+function isBernauEventHref(href) {
+  if (!href) return false;
+  try {
+    const url = new URL(href, BERNAU_URL);
+    return (
+      /(^|\.)best-bernau\.de$/i.test(url.hostname) &&
+      BERNAU_EVENT_PATH_RE.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function chooseBernauCard($, link) {
+  let node = $(link);
+  let best = node.parent();
+
+  for (let depth = 0; depth < 9; depth += 1) {
+    node = node.parent();
+    if (!node.length) break;
+
+    const text = normalize(node.text());
+    const eventLinkCount = node
+      .find("a[href]")
+      .filter((_, anchor) => isBernauEventHref($(anchor).attr("href"))).length;
+
+    if (
+      eventLinkCount === 1 &&
+      /\d{1,2}:\d{2}/.test(text) &&
+      text.length >= 12 &&
+      text.length <= 1200
+    ) {
+      best = node;
+      if (node.is("article, li") || /event|termin|veranstaltung/i.test(node.attr("class") || "")) {
+        break;
+      }
+    }
+  }
+
+  return best;
+}
+
+function cleanBernauLocation(value, title) {
+  let location = normalize(value)
+    .replace(/^[•·|–—:\s]+/, "")
+    .replace(/\s+(?:mehr(?: erfahren)?|details?)\s*$/i, "")
+    .trim();
+
+  if (!location || location === title) return null;
+
+  const categoryPrefix = [...BERNAU_CATEGORIES]
+    .sort((a, b) => b.length - a.length)
+    .find((category) =>
+      location.toLocaleLowerCase("de-DE").startsWith(`${category} `)
+    );
+
+  if (categoryPrefix) {
+    location = normalize(location.slice(categoryPrefix.length));
+  }
+
+  if (!location || BERNAU_CATEGORIES.has(location.toLocaleLowerCase("de-DE"))) {
+    return null;
+  }
+
+  return location.slice(0, 220);
+}
+
+function extractBernauLocation($, card, title, timeMatch) {
+  const cardText = normalize(card.text());
+
+  if (timeMatch) {
+    const endIndex = (timeMatch.index || 0) + timeMatch[0].length;
+    const afterTime = cleanBernauLocation(cardText.slice(endIndex), title);
+    if (afterTime) return afterTime;
+  }
+
+  const lines = leafTextLines($, card);
+  const timeIndex = lines.findIndex((line) => /\d{1,2}:\d{2}/.test(line));
+
+  if (timeIndex >= 0) {
+    const inlineMatch = lines[timeIndex].match(
+      /\d{1,2}:\d{2}(?:\s*(?:–|—|-)\s*\d{1,2}:\d{2})?\s*(?:Uhr)?\s*[•·|]\s*(.+)$/i
+    );
+    if (inlineMatch) {
+      const inlineLocation = cleanBernauLocation(inlineMatch[1], title);
+      if (inlineLocation) return inlineLocation;
+    }
+
+    for (const line of lines.slice(timeIndex + 1, timeIndex + 5)) {
+      const candidate = cleanBernauLocation(line, title);
+      if (
+        candidate &&
+        !/\d{1,2}:\d{2}/.test(candidate) &&
+        !parseGermanHeadingDate(candidate)
+      ) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+function elementOwnText($, element) {
+  return normalize($(element).clone().children().remove().end().text());
+}
+
+function parseBernauEvents(html) {
+  const $ = cheerio.load(html);
+  const results = [];
+  const seen = new Set();
+  let currentDate = null;
+
+  $("body *").each((_, element) => {
+    const node = $(element);
+    const ownText = elementOwnText($, element);
+    const fullText = normalize(node.text());
+    const headingDate =
+      parseGermanHeadingDate(ownText) ||
+      (fullText.length <= 60 ? parseGermanHeadingDate(fullText) : null);
+
+    if (headingDate) {
+      currentDate = headingDate;
+      return;
+    }
+
+    if (!node.is("a[href]") || !currentDate) return;
+
+    const href = node.attr("href");
+    if (!isBernauEventHref(href)) return;
+
+    const url = absoluteUrl(href, BERNAU_URL);
+    const title = normalize(node.text());
+    if (!url || !title || title.length < 2) return;
+
+    const card = chooseBernauCard($, element);
+    const cardText = normalize(card.text());
+    const { startTime, endTime, match } = parseTimes(cardText);
+    if (!startTime) return;
+
+    const location = extractBernauLocation($, card, title, match);
+    const dedupeKey = [currentDate, startTime, title, location || "", url].join("|");
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+
+    results.push({
+      id: `bernau:${dedupeKey}`,
+      title,
+      startDate: currentDate,
+      endDate: currentDate,
+      startTime,
+      endTime,
+      location,
+      url,
+      image: null,
+      source: "Tourist-Information Bernau",
+      sourceKey: "bernau"
+    });
+  });
+
+  return sortAndFilter(results);
+}
+
+async function fetchHtml(url, userAgent) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": userAgent,
+      Accept: "text/html,application/xhtml+xml"
+    },
+    signal: AbortSignal.timeout(18000)
+  });
+
+  if (!response.ok) {
+    throw new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
+  }
+
+  return response.text();
+}
+
+function dedupeMergedEvents(events) {
+  const seen = new Set();
+  return events.filter((event) => {
+    const key = [
+      event.sourceKey,
+      event.startDate,
+      event.startTime || "",
+      normalize(event.title).toLocaleLowerCase("de-DE"),
+      normalize(event.location || "").toLocaleLowerCase("de-DE")
+    ].join("|");
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export { parseWandlitzEvents, parseBernauEvents };
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -308,53 +542,87 @@ export default async function handler(req, res) {
     MAX_LIMIT
   );
 
-  try {
-    const upstream = await fetch(SOURCE_URL, {
-      headers: {
-        "User-Agent":
-          "WandlitzEventsWidget/1.0 (+public event list; cached server-side)",
-        Accept: "text/html,application/xhtml+xml"
-      },
-      signal: AbortSignal.timeout(15000)
-    });
-
-    if (!upstream.ok) {
-      throw new Error(`Upstream returned HTTP ${upstream.status}`);
+  const sourceJobs = [
+    {
+      key: "wandlitz",
+      label: "Gemeinde Wandlitz",
+      url: WANDLITZ_URL,
+      parser: parseWandlitzEvents
+    },
+    {
+      key: "bernau",
+      label: "Tourist-Information Bernau",
+      url: BERNAU_URL,
+      parser: parseBernauEvents
     }
+  ];
 
-    const html = await upstream.text();
-    const events = parseEvents(html).slice(0, limit);
-
-    if (!events.length) {
-      throw new Error(
-        "No events found. The source page structure may have changed."
+  const settled = await Promise.allSettled(
+    sourceJobs.map(async (source) => {
+      const html = await fetchHtml(
+        source.url,
+        `RegionalEventsWidget/2.0 (+public event list; cached server-side; source=${source.key})`
       );
+      return { source, events: source.parser(html) };
+    })
+  );
+
+  const events = [];
+  const sources = [];
+  const warnings = [];
+
+  settled.forEach((result, index) => {
+    const source = sourceJobs[index];
+    if (result.status === "fulfilled" && result.value.events.length) {
+      events.push(...result.value.events);
+      sources.push({
+        key: source.key,
+        label: source.label,
+        url: source.url,
+        count: result.value.events.length,
+        ok: true
+      });
+      return;
     }
 
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader(
-      "Cache-Control",
-      "public, s-maxage=21600, stale-while-revalidate=86400"
-    );
+    const reason =
+      result.status === "rejected"
+        ? String(result.reason?.message || result.reason)
+        : "No events found. The source page structure may have changed.";
 
-    return res.status(200).json({
-      source: SOURCE_URL,
-      sourceOrigin: SOURCE_ORIGIN,
-      fetchedAt: new Date().toISOString(),
-      count: events.length,
-      events
+    warnings.push(`${source.label}: ${reason}`);
+    sources.push({
+      key: source.key,
+      label: source.label,
+      url: source.url,
+      count: 0,
+      ok: false
     });
-  } catch (error) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "no-store");
+  });
 
+  const merged = dedupeMergedEvents(sortAndFilter(events)).slice(0, limit);
+
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  if (!merged.length) {
+    res.setHeader("Cache-Control", "no-store");
     return res.status(502).json({
       error: "Die Veranstaltungsdaten konnten nicht geladen werden.",
-      detail:
-        process.env.NODE_ENV === "development"
-          ? String(error?.message || error)
-          : undefined,
-      source: SOURCE_URL
+      warnings,
+      sources
     });
   }
+
+  res.setHeader(
+    "Cache-Control",
+    "public, s-maxage=21600, stale-while-revalidate=86400"
+  );
+
+  return res.status(200).json({
+    fetchedAt: new Date().toISOString(),
+    count: merged.length,
+    sources,
+    warnings,
+    events: merged
+  });
 }
