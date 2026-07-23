@@ -6,6 +6,9 @@ const WANDLITZ_URLS = [
   "https://www.wandlitz.de/veranstaltungen/index.php"
 ].filter((value, index, values) => value && values.indexOf(value) === index);
 const WANDLITZ_URL = WANDLITZ_URLS[0];
+const WANDLITZ_READER_URL =
+  process.env.WANDLITZ_READER_URL ||
+  "https://r.jina.ai/https://www.wandlitz.de/veranstaltungen/";
 const BERNAU_URL =
   process.env.BERNAU_SOURCE_URL || "https://www.bernau-besuchen.de/veranstaltungen-2";
 
@@ -298,6 +301,93 @@ function extractWandlitzImage($, card) {
   return null;
 }
 
+
+function decodeHtml(value = "") {
+  return cheerio.load(`<span>${value}</span>`)("span").text();
+}
+
+function cleanMarkdownText(value = "") {
+  return normalize(
+    decodeHtml(value)
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/^[-*+]\s+/, "")
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/[*_`~]/g, "")
+  );
+}
+
+function looksLikeReaderMetadata(line, title) {
+  const value = cleanMarkdownText(line);
+  if (!value) return true;
+  const lower = value.toLocaleLowerCase("de-DE");
+
+  return (
+    value === title ||
+    /^(title|url source|published time|markdown content):/i.test(value) ||
+    /^(navigation|start|veranstaltungen|listenansicht|kalender ansicht)$/i.test(value) ||
+    /veranstaltung kostenlos melden/i.test(value) ||
+    /^(sa|so|mo|di|mi|do|fr)[,.]?\s*\d{1,2}\./i.test(value) ||
+    /\d{1,2}:\d{2}/.test(value) ||
+    /^image\s*:/i.test(value) ||
+    lower.length < 3
+  );
+}
+
+function readerLocation(lines, eventIndex, title) {
+  for (const rawLine of lines.slice(eventIndex + 1, eventIndex + 8)) {
+    const value = cleanMarkdownText(rawLine);
+    if (!value || looksLikeReaderMetadata(value, title)) continue;
+    if (/^#{1,6}\s/.test(rawLine)) break;
+    if (/^https?:\/\//i.test(value)) continue;
+    if (value.length > 220) continue;
+    return value;
+  }
+  return null;
+}
+
+function parseWandlitzReaderEvents(markdown) {
+  const lines = String(markdown || "").split(/\r?\n/);
+  const results = [];
+  const seen = new Set();
+  const eventLinkRe = /(?<!!)\[([^\]]+)\]\((https?:\/\/(?:www\.)?wandlitz\.de\/veranstaltungen\/\d+\/(\d{4})\/(\d{2})\/(\d{2})\/[^)\s]+?\.html(?:\?[^)]*)?)\)/i;
+
+  lines.forEach((line, index) => {
+    const match = line.match(eventLinkRe);
+    if (!match) return;
+
+    const title = cleanMarkdownText(match[1]);
+    const url = match[2];
+    if (!title || title.length < 2 || seen.has(url)) return;
+    seen.add(url);
+
+    const startDate = isoDate(Number(match[3]), Number(match[4]), Number(match[5]));
+    const before = lines.slice(Math.max(0, index - 10), index);
+    const dateContext = before.map(cleanMarkdownText).join(" ");
+    const timeLine = [...before]
+      .reverse()
+      .map(cleanMarkdownText)
+      .find((value) => /\d{1,2}:\d{2}/.test(value));
+    const { startTime, endTime } = parseTimes(timeLine || "");
+
+    results.push({
+      id: `wandlitz:${url.match(/\/veranstaltungen\/(\d+)\//)?.[1] || url}`,
+      title,
+      startDate,
+      endDate: parseLastGermanDate(dateContext, startDate),
+      startTime,
+      endTime,
+      location: readerLocation(lines, index, title),
+      url,
+      image: null,
+      source: "Gemeinde Wandlitz",
+      sourceKey: "wandlitz"
+    });
+  });
+
+  return sortAndFilter(results);
+}
+
 function parseWandlitzEvents(html) {
   const $ = cheerio.load(html);
   const results = [];
@@ -530,6 +620,74 @@ async function fetchHtml(url, userAgent = BROWSER_USER_AGENT) {
   return html;
 }
 
+
+async function fetchPlainText(url) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": BROWSER_USER_AGENT,
+      Accept: "text/plain,text/markdown;q=0.9,*/*;q=0.5",
+      "X-Return-Format": "markdown"
+    },
+    redirect: "follow",
+    signal: AbortSignal.timeout(30000)
+  });
+
+  if (!response.ok) {
+    throw new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
+  }
+
+  const text = await response.text();
+  if (text.length < 1000) {
+    throw new Error(`${new URL(url).hostname} returned an unexpectedly short page`);
+  }
+
+  return text;
+}
+
+async function fetchWandlitzEvents(source) {
+  const failures = [];
+
+  for (const url of source.urls) {
+    for (const userAgent of source.userAgents) {
+      try {
+        const html = await fetchHtml(url, userAgent);
+        const events = parseWandlitzEvents(html);
+        if (events.length) {
+          return {
+            source,
+            events,
+            fetchedUrl: url,
+            strategy: "direct-html"
+          };
+        }
+        failures.push(`${url}: HTML geladen, aber keine Termine erkannt`);
+      } catch (error) {
+        failures.push(`${url}: ${String(error?.message || error)}`);
+      }
+    }
+  }
+
+  try {
+    const markdown = await fetchPlainText(WANDLITZ_READER_URL);
+    const events = parseWandlitzReaderEvents(markdown);
+    if (events.length) {
+      return {
+        source,
+        events,
+        fetchedUrl: WANDLITZ_READER_URL,
+        strategy: "reader-fallback"
+      };
+    }
+    failures.push(`${WANDLITZ_READER_URL}: Reader geladen, aber keine Termine erkannt`);
+  } catch (error) {
+    failures.push(
+      `${WANDLITZ_READER_URL}: ${String(error?.message || error)}`
+    );
+  }
+
+  throw new Error(failures.join(" | "));
+}
+
 async function fetchAndParseSource(source) {
   const failures = [];
   const urls = source.urls || [source.url];
@@ -572,7 +730,44 @@ function dedupeMergedEvents(events) {
   });
 }
 
-export { parseWandlitzEvents, parseBernauEvents };
+function selectEventsFairly(events, limit, sourceKeys) {
+  const sorted = sortAndFilter(events);
+  if (sorted.length <= limit) return sorted;
+
+  const activeSourceKeys = sourceKeys.filter((sourceKey) =>
+    sorted.some((event) => event.sourceKey === sourceKey)
+  );
+
+  if (activeSourceKeys.length <= 1) return sorted.slice(0, limit);
+
+  const minimumPerSource = Math.floor(limit / activeSourceKeys.length);
+  const selected = [];
+  const selectedIds = new Set();
+
+  for (const sourceKey of activeSourceKeys) {
+    const sourceEvents = sorted
+      .filter((event) => event.sourceKey === sourceKey)
+      .slice(0, minimumPerSource);
+
+    for (const event of sourceEvents) {
+      selected.push(event);
+      selectedIds.add(event.id);
+    }
+  }
+
+  for (const event of sorted) {
+    if (selected.length >= limit) break;
+    if (selectedIds.has(event.id)) continue;
+    selected.push(event);
+    selectedIds.add(event.id);
+  }
+
+  return selected.sort((a, b) =>
+    eventSortKey(a).localeCompare(eventSortKey(b), "de")
+  );
+}
+
+export { parseWandlitzEvents, parseWandlitzReaderEvents, parseBernauEvents };
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -596,7 +791,8 @@ export default async function handler(req, res) {
         BROWSER_USER_AGENT,
         "WandlitzEventsWidget/1.0 (+public event list; cached server-side)"
       ],
-      parser: parseWandlitzEvents
+      parser: parseWandlitzEvents,
+      loader: fetchWandlitzEvents
     },
     {
       key: "bernau",
@@ -608,7 +804,9 @@ export default async function handler(req, res) {
   ];
 
   const settled = await Promise.allSettled(
-    sourceJobs.map((source) => fetchAndParseSource(source))
+    sourceJobs.map((source) =>
+      source.loader ? source.loader(source) : fetchAndParseSource(source)
+    )
   );
 
   const events = [];
@@ -624,6 +822,7 @@ export default async function handler(req, res) {
         label: source.label,
         url: source.url,
         fetchedUrl: result.value.fetchedUrl,
+        strategy: result.value.strategy || "direct-html",
         count: result.value.events.length,
         ok: true
       });
@@ -645,7 +844,23 @@ export default async function handler(req, res) {
     });
   });
 
-  const merged = dedupeMergedEvents(sortAndFilter(events)).slice(0, limit);
+  const deduped = dedupeMergedEvents(events);
+  const merged = selectEventsFairly(
+    deduped,
+    limit,
+    sourceJobs.map((source) => source.key)
+  );
+
+  const returnedCounts = Object.fromEntries(
+    sourceJobs.map((source) => [
+      source.key,
+      merged.filter((event) => event.sourceKey === source.key).length
+    ])
+  );
+
+  sources.forEach((source) => {
+    source.returnedCount = returnedCounts[source.key] || 0;
+  });
 
   res.setHeader("Access-Control-Allow-Origin", "*");
 
@@ -666,7 +881,7 @@ export default async function handler(req, res) {
   );
 
   return res.status(200).json({
-    version: "5.0.0",
+    version: "7.0.0",
     fetchedAt: new Date().toISOString(),
     count: merged.length,
     sources,
